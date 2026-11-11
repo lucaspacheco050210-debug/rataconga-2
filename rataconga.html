@@ -1,0 +1,71 @@
+<main>
+  <h1>Sistema de proteção climática</h1>
+  <p>Consulte os alertas climáticos ativos para o seu estado.</p>
+
+  <form id="consulta-clima">
+    <label for="estado">Sigla do estado (ex.: SP)</label>
+    <input id="estado" name="estado" type="text" maxlength="2" pattern="[A-Za-z]{2}" required>
+    <button type="submit">Consultar alertas</button>
+  </form>
+
+  <p id="resultado" role="status" aria-live="polite"></p>
+  <ul id="alertas"></ul>
+
+  <script>
+    const form = document.getElementById("consulta-clima");
+    const campoEstado = document.getElementById("estado");
+    const resultado = document.getElementById("resultado");
+    const listaAlertas = document.getElementById("alertas");
+    const botao = form.querySelector("button");
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      resultado.textContent = "Consultando alertas...";
+      listaAlertas.replaceChildren();
+      botao.disabled = true;
+
+      try {
+        const estado = campoEstado.value.trim().toUpperCase();
+        const url = new URL("http://127.0.0.1:8000/alerta-climatico");
+        url.searchParams.set("estado", estado);
+
+        const resposta = await fetch(url);
+        const dados = await resposta.json();
+        if (!resposta.ok) {
+          throw new Error(dados.detail || "Não foi possível consultar os alertas.");
+        }
+
+        if (dados.tem_alerta_grande) {
+          resultado.textContent = `Alertas ativos para ${dados.estado}:`;
+          for (const alerta of dados.alertas) {
+            const item = document.createElement("li");
+            const titulo = document.createElement("strong");
+            titulo.textContent = [alerta.evento, alerta.severidade].filter(Boolean).join(" - ");
+            item.append(titulo);
+
+            for (const [rotulo, valor] of [
+              ["Início", alerta.inicio],
+              ["Fim", alerta.fim],
+              ["Descrição", alerta.descricao],
+            ]) {
+              if (valor) {
+                const detalhe = document.createElement("p");
+                detalhe.textContent = `${rotulo}: ${valor}`;
+                item.append(detalhe);
+              }
+            }
+            listaAlertas.append(item);
+          }
+        } else {
+          resultado.textContent = dados.mensagem;
+        }
+      } catch (erro) {
+        resultado.textContent = erro instanceof Error
+          ? `Erro ao consultar a API: ${erro.message}`
+          : "Erro ao consultar a API.";
+      } finally {
+        botao.disabled = false;
+      }
+    });
+  </script>
+</main>
